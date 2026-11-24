@@ -1,0 +1,4 @@
+* text=auto
+/Names.txt -text whitespace=-trailing-space
+/wpc50.dat -text whitespace=-trailing-space
+*.pdf binary
