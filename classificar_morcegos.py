@@ -33,6 +33,7 @@ def ler_dados():
     nomes = (PASTA / "Names.txt").read_text(encoding="utf-8").splitlines()
     nomes = [nome.strip() for nome in nomes]
     atributos = np.loadtxt(PASTA / "wpc50.dat")
+    # A SVM precisa das 50 medidas de cada organismo. Um valor ausente ou infinito impediria o treino.
     if len(nomes) != 8426 or atributos.shape != (len(nomes), 50) or not np.isfinite(atributos).all():
         raise ValueError("A base deve ter 8.426 nomes e 50 valores finitos por linha.")
 
@@ -76,8 +77,10 @@ def escolher_candidatos(atributos, classes, consultados):
     pontuacoes = svm.decision_function(atributos[restantes])
     # Acima de zero, a SVM indica morcego. A pontuação ajuda a decidir quem conferir primeiro.
     positivos = pontuacoes > 0
+    # Guardamos a posição na base original para consultar o nome certo depois de filtrar os candidatos.
     indicados = restantes[positivos]
     pontuacoes_positivas = pontuacoes[positivos]
+    # Se dois candidatos empatam na última vaga do lote, entra o que aparece primeiro no arquivo.
     ordem = np.argsort(-pontuacoes_positivas, kind="stable")[:TAMANHO_LOTE]
     return indicados[ordem], pontuacoes_positivas[ordem]
 
@@ -131,6 +134,7 @@ def prospectar(nomes, atributos, referencia, apresentar=False):
 
     rodada = 1
     while (etapas == "sem indicação").any():
+        # Quem já foi conferido entra no próximo treino e sai da fila de consulta, mesmo que tenha recebido classe 0.
         consultados = etapas != "sem indicação"
         if apresentar:
             avancar("Treinar a SVM e procurar candidatos nas linhas restantes.")
@@ -168,10 +172,12 @@ def avaliar(atributos, classes, nomes, apresentar=False):
     for parte, (treino, teste) in enumerate(divisoes.split(atributos, classes), start=1):
         # Recomeçamos em cada parte para que nem o ajuste da escala nem a SVM tenham visto o teste.
         modelo = criar_svm().fit(atributos[treino], classes[treino])
+        # As linhas do teste estão espalhadas pela base. Cada previsão volta à posição do seu organismo.
         previsoes[teste] = modelo.predict(atributos[teste])
         if apresentar:
             erros = np.count_nonzero(previsoes[teste] != classes[teste])
             print(f"{parte:>5}   {len(treino):>15}   {len(teste):>15}   {erros:>14}")
+    # Um falso positivo é outro organismo marcado como morcego. Um falso negativo é um morcego que passou despercebido.
     vn, fp, fn, vp = confusion_matrix(classes, previsoes, labels=[0, 1]).ravel()
     if apresentar:
         avancar("Comparar as previsões com as classes confirmadas.")
@@ -220,6 +226,7 @@ def principal(apresentar=False):
     avaliar(atributos, classes, nomes, apresentar)
     if apresentar:
         avancar("Gravar a classificação e os índices dos morcegos.")
+    # As previsões do teste servem para medir os acertos. A lista final usa as classes da busca já conferidas.
     exportar(nomes, classes, etapas)
     if apresentar:
         print(f"\nresultados/classificacao.csv       {len(classes)} linhas de dados")
