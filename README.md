@@ -4,6 +4,8 @@ Trabalho de reconhecimento de padrões da disciplina DS803, UFPR. A classe `1` r
 
 [Enunciado do trabalho no Drive da disciplina](https://drive.google.com/file/d/1rgFNyVS6eeG3GUL6dRMKwjYgZm-r98P2/view).
 
+[Leia a resolução passo a passo](docs/resolucao.md) para entender como os dados foram rotulados, como as rodadas encontraram candidatos e o que significam as métricas.
+
 ## Executar
 
 Com Python 3.14, abra o PowerShell nesta pasta e rode:
