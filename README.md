@@ -1,16 +1,14 @@
 # É morcego?
 
-Trabalho de reconhecimento de padrões da disciplina DS803, UFPR. A classe `1` representa morcegos (ordem Chiroptera) e a classe `0` representa os demais organismos. O índice começa em 1 e corresponde à linha nos dois arquivos do professor.
+Trabalho de reconhecimento de padrões da disciplina DS803 da UFPR. O objetivo é identificar os morcegos em uma lista de **8.426 organismos**, a partir das 50 características fornecidas para cada linha. [Enunciado do trabalho](https://drive.google.com/file/d/1rgFNyVS6eeG3GUL6dRMKwjYgZm-r98P2/view)
 
-[Enunciado do trabalho no Drive da disciplina](https://drive.google.com/file/d/1rgFNyVS6eeG3GUL6dRMKwjYgZm-r98P2/view).
-
-Partimos de 11 morcegos conhecidos. As seis rodadas encontraram mais 52. A SVM examinou as 8.220 linhas que restavam, indicou outras 16 e a consulta taxonômica confirmou as 16. A lista final reúne os **79 morcegos**.
+Começamos com 29 exemplos conhecidos. Em quatro rodadas, uma SVM indicou 73 linhas para conferência. Dessas, 67 eram morcegos. Somadas aos 12 morcegos iniciais, completaram os **79 registros positivos**.
 
 [Resolução passo a passo](docs/resolucao.md) · [Relatório](relatorio_morcegos.pdf) · [Slides em PDF](output/pdf/slides_morcegos.pdf) · [Roteiro de apresentação](output/pdf/roteiro_apresentacao_morcegos.pdf)
 
-## Executar
+## Como executar
 
-Com Python 3.14, abra o PowerShell nesta pasta e rode:
+Com Python 3.14, abra o PowerShell na pasta do projeto e execute:
 
 ```powershell
 python -m venv .venv
@@ -18,34 +16,13 @@ python -m venv .venv
 .\.venv\Scripts\python.exe classificar_morcegos.py
 ```
 
-Se você usa `uv`, execute `uv run --python 3.14 --with-requirements requirements.txt python classificar_morcegos.py`. A referência taxonômica já está em `dados/`. Após instalar as dependências, o experimento pode ser executado sem internet.
+Se usar `uv`, o comando equivalente é `uv run --python 3.14 --with-requirements requirements.txt python classificar_morcegos.py`. A execução usa os arquivos do professor e uma [tabela local de rótulos e fontes](dados/rotulos.csv). Após instalar as dependências, funciona sem internet.
 
-## Como explicar o código
-
-1. `ler_dados` confere o alinhamento por linha entre os nomes, as 50 características e a tabela de referência.
-2. `prospectar` começa com exemplos pesquisados. Em cada rodada, `priorizar_candidatos` escolhe 12 vizinhos de morcegos conhecidos, 12 pontos perto da fronteira da SVM e 6 exemplos ao acaso. A base de treino cresce com os rótulos desses 30 candidatos confirmados na referência.
-3. `avaliar_rodadas` mede a SVM em uma parte reservada da base. Essas linhas ficam fora da seleção de candidatos e do treino durante as seis rodadas.
-4. `concluir_prospeccao` treina a SVM com os 206 exemplos consultados e procura morcegos nas 8.220 linhas restantes. O programa consulta o rótulo dos 16 candidatos que a SVM indica. Com isso, monta a lista final e confere cada classe contra a referência completa.
-5. `avaliar_base_final` compara SVM e k-NN em cinco partes. Cada previsão vem de um modelo treinado nas outras quatro. A divisão mantém juntos os registros com o mesmo TaxID de espécie quando disponível, usando o TaxID encontrado nos demais casos.
-
-## Arquivos da entrega
+## O que o programa entrega
 
 | Arquivo | Conteúdo |
-|---|---|
-| `resultados/classificacao.csv` | Classe das 8.426 linhas na ordem original |
-| `resultados/indices_morcegos.txt` | Índices dos 79 morcegos, um por linha |
-| `resultados/candidatos.csv` | 26 exemplos iniciais, 180 candidatos das rodadas e 16 candidatos da triagem final, identificados por `fechamento` |
-| `resultados/rodadas.csv` | Evolução da base e desempenho na partição reservada |
-| `resultados/metricas.csv` | Matriz de confusão e métricas agregadas por modelo |
-| `resultados/previsoes_validacao.csv` | Partição, classe e previsões de SVM e k-NN para cada linha |
-| `dados/referencia_taxonomica.csv` | Nome original, rótulo, TaxID, método e fonte de cada confirmação |
+| --- | --- |
+| [Classificação](resultados/classificacao.csv) | Uma linha por organismo com índice, nome, classe e etapa da busca. A classe 1 indica morcego e a classe 0 indica outro organismo. |
+| [Índices dos morcegos](resultados/indices_morcegos.txt) | Os 79 números de linha positivos, na ordem dos arquivos do professor. A primeira linha tem índice 1. |
 
-## Reconstruir a referência taxonômica
-
-Esta etapa é opcional. `preparar_referencia.py` usa `names.dmp` e `nodes.dmp` do [taxdump público do NCBI](https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz). O cruzamento normaliza maiúsculas e separadores, busca o nome completo e, quando necessário, um prefixo taxonômico. A tabela `dados/nomes_revisados.csv` registra os casos revisados com fonte específica.
-
-```powershell
-python preparar_referencia.py caminho\para\taxdump.tar.gz
-```
-
-A referência entregue corresponde à cópia de 24 de novembro de 2026. O SHA-256 do arquivo consultado é `8cb819bc271aebd6c5a7c56ccc23f296d3283369d7049dab5849de373f502eb5`. Versões futuras do NCBI podem trocar nomes e TaxIDs. Para reproduzir os números do relatório, use o CSV de referência incluído.
+O programa imprime as contagens de cada rodada e as três métricas da avaliação final. Em cinco partes de validação, a SVM encontrou os 79 morcegos e indicou um outro organismo por engano: **100,00% de sensibilidade, 98,75% de precisão e 99,99% de acurácia**.
