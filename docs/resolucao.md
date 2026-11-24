@@ -1,86 +1,48 @@
 # Como identificamos os morcegos
 
-O desafio era identificar quais das **8.426 linhas** da base da disciplina representam morcegos. Começamos com alguns exemplos conhecidos, usamos as características numéricas para procurar outros candidatos e recorremos à taxonomia para confirmar cada classe. Ao final, medimos quantos morcegos os modelos conseguem reconhecer quando recebem apenas os números.
+## 1. Ligar o nome às 50 características
 
-## 1. Entenda o que há em cada linha
+A linha 2291 de [Names.txt](../Names.txt) contém `Desmodus_rotundus`, o morcego-vampiro. Na mesma linha de [wpc50.dat](../wpc50.dat) estão os 50 números que o professor forneceu para esse organismo. A posição liga os dois arquivos. Usamos o nome para conferir a classe e os números para o modelo aprender.
 
-Os dois arquivos têm a mesma ordem. A linha 2291 de [`Names.txt`](../Names.txt) contém `Desmodus_rotundus`. A linha 2291 de [`wpc50.dat`](../wpc50.dat) contém os 50 valores desse organismo, derivados de dados mitocondriais. O número da linha é o índice que aparece nos resultados.
+## 2. Começar com exemplos das duas classes
 
-Cada modelo recebe **os 50 valores** como entrada. O nome científico serve para consultar a referência e registrar de qual organismo veio o resultado. O relatório usa PCA, que resume parte da informação em dois eixos para desenhar um gráfico. O treinamento e a busca de candidatos usam as 50 características.
+Um rótulo é a resposta conhecida para um exemplo. Atribuímos **1** aos morcegos, que pertencem à ordem *Chiroptera*, e **0** aos demais organismos. A [tabela de rótulos](../dados/rotulos.csv) registra o nome, a classe e a fonte taxonômica usada. Ela já está preparada para o experimento. Nas rodadas, o programa consulta a classe dos exemplos iniciais e de cada candidato depois de escolhê-lo.
 
-## 2. Prepare a referência e a amostra inicial
+Começamos com **12 morcegos e 17 outros organismos**. Entre eles estão *Desmodus rotundus* (classe 1) e o gato *Felis catus* (classe 0). Há outros mamíferos entre os negativos para que o treino inclua exemplos que compartilham características com os morcegos.
 
-Usamos a linhagem no [NCBI Taxonomy](https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=9397) para definir a classe. Quem pertence à ordem **Chiroptera** recebe `1` (morcego). Os demais recebem `0` (outro).
+## 3. Procurar novos morcegos em rodadas
 
-O [`preparar_referencia.py`](../preparar_referencia.py) cruza os nomes da base com uma cópia da taxonomia. A [tabela de referência](../dados/referencia_taxonomica.csv) guarda o índice, o nome original, a classe, o identificador taxonômico (TaxID), o método de correspondência e o link da evidência. Grafias ou identificações que precisaram de revisão específica estão em [`nomes_revisados.csv`](../dados/nomes_revisados.csv).
+Usamos um único classificador, a **SVM**. Ele aprende uma fronteira entre as duas classes. O kernel RBF permite que a fronteira seja curva. Antes do treino, colocamos as características em escalas comparáveis. Os pesos das classes levam em conta a quantidade de exemplos de cada uma.
 
-Para começar a busca, usamos **26 exemplos** já conhecidos na parte de desenvolvimento, sendo 11 morcegos e 15 outros organismos. *Desmodus rotundus* é um exemplo de classe `1`. *Felis catus*, o gato doméstico, é um exemplo de classe `0`. Uma parte da base ficou reservada para medir o desempenho durante as rodadas.
+1. Treinamos a SVM com as linhas que já têm classe conhecida.
+2. Aplicamos o modelo às linhas restantes. Uma pontuação acima de zero indica um possível morcego. Escolhemos até 20 candidatos por vez, começando pelas maiores pontuações.
+3. Conferimos as classes desses candidatos na tabela de rótulos. Todos entram no treino seguinte, inclusive os que o modelo indicou por engano.
+4. Repetimos até a SVM deixar de indicar novas linhas. As linhas que ficaram sem indicação recebem classe 0.
 
-## 3. Procure candidatos em seis rodadas
+Na primeira rodada, a SVM indicou a linha **3942**, de *Lasiurus borealis*. A referência confirmou que era morcego. Já a linha **2649**, de *Eremitalpa granti*, foi indicada na quarta rodada e recebeu classe 0 após a consulta.
 
-A cada rodada, ajustamos as escalas dos 50 valores com os exemplos já confirmados. Em seguida, treinamos uma **SVM**, um modelo que aprende uma fronteira entre os dois grupos. Aqui usamos a versão com kernel RBF, que permite que essa fronteira seja curva, e pesos balanceados para dar importância à classe com menos exemplos.
-
-Em cada lote, escolhemos **30 linhas ainda disponíveis**, nesta ordem:
-
-| Quantidade | Como escolhemos | Por que usamos |
-| --- | --- | --- |
-| 12 | Menor distância até algum morcego já confirmado | Características parecidas podem indicar outro morcego |
-| 12 | Pontuações da SVM mais próximas de zero, onde fica a fronteira | Casos próximos da fronteira ajudam a refinar a separação |
-| 6 | Sorteio entre as linhas restantes | Permite examinar exemplos fora das duas prioridades |
-
-Na primeira rodada, a vizinhança indicou a linha **6748**, de *Rhinolophus pumilus*. A referência confirmou a classe `1`, e a linha passou a integrar o treino da rodada seguinte. O mesmo processo incorpora candidatos confirmados como classe `0`. A seleção usa os rótulos dos exemplos já conhecidos. Cada rótulo novo é consultado depois que a linha é escolhida.
-
-```mermaid
-flowchart TD
-    A[Exemplos confirmados] --> B[Selecionar candidatos pelos 50 valores]
-    B --> C[Consultar o rótulo na referência taxonômica]
-    C --> D[Adicionar os rótulos confirmados ao treino]
-    D --> A
-```
-
-| Etapa | Rótulos acumulados | Morcegos novos | Morcegos acumulados |
+| Etapa | Linhas consultadas na etapa | Morcegos na etapa | Total de morcegos |
 | --- | ---: | ---: | ---: |
-| Amostra inicial | 26 | — | 11 |
-| Rodada 1 | 56 | 12 | 23 |
-| Rodada 2 | 86 | 17 | 40 |
-| Rodada 3 | 116 | 13 | 53 |
-| Rodada 4 | 146 | 10 | 63 |
-| Rodada 5 | 176 | 0 | 63 |
-| Rodada 6 | 206 | 0 | 63 |
+| Pesquisa inicial | 29 | 12 | 12 |
+| Rodada 1 | 20 | 20 | 32 |
+| Rodada 2 | 20 | 20 | 52 |
+| Rodada 3 | 20 | 20 | 72 |
+| Rodada 4 | 13 | 7 | 79 |
 
-Dos 52 novos morcegos, **46 vieram pela vizinhança** e **6 pela fronteira da SVM**. O sorteio trouxe exemplos da classe `0`. A [lista de candidatos](../resultados/candidatos.csv) mostra a rodada, o critério e a classe confirmada de cada linha.
+Ao todo, consultamos **102 linhas durante a busca**. Após o último treino, a SVM deixou de indicar candidatos entre as 8.324 restantes. Esse foi o critério de parada. Para verificar se algum morcego tinha ficado de fora, comparamos a lista pronta com os rótulos de referência. As 8.426 classes coincidiram.
 
-## 4. Passe dos 63 morcegos das rodadas aos 79 da lista
+## 4. Medir o desempenho depois de fechar a lista
 
-Primeiro medimos o efeito das rodadas. Para cada etapa, treinamos a SVM com os exemplos disponíveis naquele momento e fizemos o mesmo teste em **1.686 linhas reservadas**, entre elas 16 morcegos. A SVM detectou os 16 desde o início. As linhas marcadas por engano como morcego caíram de cinco para zero após a primeira rodada. A reserva ficou fora da seleção e do treino durante as seis rodadas.
+Para descobrir com que frequência a SVM acerta uma linha que ficou fora do seu treino, dividimos a base rotulada em **cinco partes**, mantendo proporções semelhantes de morcegos. Treinamos em quatro partes e testamos na outra. Repetimos até que cada parte tivesse sido usada para teste uma vez. Em cada treino, o ajuste de escala usou apenas as quatro partes disponíveis para aprender.
 
-Depois desse teste, ainda tínhamos **8.220 linhas sem consulta individual na busca**. Como descobrir se alguma era morcego?
-
-1. Treinamos a SVM com os 206 exemplos consultados até a sexta rodada. Entre eles havia 63 morcegos.
-2. Aplicamos a SVM aos 50 valores de cada uma das 8.220 linhas restantes. O modelo indicou **16 candidatas**, entre elas a linha **3942**, de *Lasiurus borealis*.
-3. Conferimos essas 16 na referência taxonômica. Todas eram morcegos e todas estavam na parte que havia sido reservada. Elas aparecem na [lista de candidatos](../resultados/candidatos.csv) com a marca `fechamento`.
-
-Mantivemos as classes já consultadas e atribuímos a classe 0 às 8.204 linhas restantes. Assim chegamos aos **11 morcegos iniciais + 52 encontrados nas rodadas + 16 do fechamento = 79**. Por fim, comparamos a lista pronta com a referência completa. As 8.426 classes coincidiram.
-
-## 5. Teste os modelos na base completa
-
-Agora a pergunta é outra. Quando um modelo recebe só os números de organismos fora do seu treino, quantos ele classifica corretamente? Separamos a base rotulada em cinco partes. Cada parte serviu uma vez para teste, com as outras quatro para treino. Mantivemos juntos os registros com o mesmo identificador de espécie quando disponível. Comparamos a SVM com o **k-NN**, que prevê a classe a partir de cinco vizinhos e dá mais peso aos mais próximos.
-
-Na validação cruzada, **cada modelo previu 80 morcegos, acertou 79 e gerou um falso positivo**. Os falsos positivos ocorreram em linhas diferentes. A SVM marcou *Scapanulus oweni* (7013) e o k-NN marcou *Hylomys suillus* (3597).
-
-| Métrica | Pergunta | Resultado de cada modelo |
+| Métrica | Pergunta | Resultado |
 | --- | --- | ---: |
-| Sensibilidade | Dos morcegos confirmados, quantos o modelo encontrou? | 79 de 79 · 100,00% |
-| Precisão | Das linhas que o modelo marcou como morcego, quantas estavam certas? | 79 de 80 · 98,75% |
-| Acurácia | De todas as linhas, quantas foram classificadas corretamente? | 8.425 de 8.426 · 99,99% |
+| Sensibilidade | Dos 79 morcegos, quantos a SVM encontrou? | 79 de 79 = 100,00% |
+| Precisão | Das 80 indicações de morcego, quantas estavam certas? | 79 de 80 = 98,75% |
+| Acurácia | De todas as 8.426 previsões, quantas estavam certas? | 8.425 de 8.426 = 99,99% |
 
-Como há poucos morcegos na base, a regra de marcar todas as linhas como `0` acerta **99,06%** e perde os 79 morcegos. A sensibilidade mostra esse problema. O empate entre os modelos vale para essa divisão. Mesmo com o agrupamento por identificador, 38 linhas da classe 0 tinham os mesmos 50 valores de outra linha usada no respectivo treino.
+O único erro da validação foi marcar *Scapanulus oweni* (linha 7013) como morcego. A lista entregue contém a classe correta desse organismo. Isso é possível porque a lista registra o resultado da busca com conferência dos candidatos, enquanto as métricas contam as previsões da SVM antes de qualquer correção. Os resultados descrevem o desempenho em linhas da base da disciplina.
 
-## 6. Confira a entrega e reproduza o experimento
+## 5. Localizar o resultado
 
-- [`classificacao.csv`](../resultados/classificacao.csv) contém **79 morcegos e 8.347 outros organismos**, na ordem original. As classes foram geradas pela busca e conferidas contra a referência.
-- [`indices_morcegos.txt`](../resultados/indices_morcegos.txt) lista os 79 índices positivos, um por linha.
-- [`previsoes_validacao.csv`](../resultados/previsoes_validacao.csv) permite comparar as previsões de cada modelo com a classe confirmada.
-- [`rodadas.csv`](../resultados/rodadas.csv), [`metricas.csv`](../resultados/metricas.csv) e o [relatório](../relatorio_morcegos.pdf) registram os testes.
-
-Para reproduzir o experimento, rode [`classificar_morcegos.py`](../classificar_morcegos.py) seguindo as [instruções do README](../README.md#executar). A tabela taxonômica usada no trabalho já está incluída.
+A [classificação completa](../resultados/classificacao.csv) traz a classe de cada linha e permite ver se ela estava na amostra inicial, em qual rodada foi conferida ou se ficou sem indicação. A [lista dos índices positivos](../resultados/indices_morcegos.txt) reúne os **79 morcegos** na ordem original. Para reproduzir a solução, siga as [instruções do README](../README.md#como-executar).
