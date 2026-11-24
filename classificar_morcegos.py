@@ -2,6 +2,7 @@
 
 import argparse
 import csv
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -10,7 +11,6 @@ from sklearn.model_selection import StratifiedKFold
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
-
 
 PASTA = Path(__file__).resolve().parent
 # Com até 20 consultas por rodada, a SVM pode aprender com esse lote antes de escolher o próximo.
@@ -28,7 +28,7 @@ NOMES_INICIAIS = """
 
 
 def ler_dados():
-    # O número da linha liga o nome às 50 medidas e depois vira o índice entregue ao professor.
+    # O número da linha liga o nome às 50 medidas e depois vira o índice.
     # Se a ordem mudar em um dos arquivos, podemos atribuir as medidas de um animal a outro.
     nomes = (PASTA / "Names.txt").read_text(encoding="utf-8").splitlines()
     nomes = [nome.strip() for nome in nomes]
@@ -53,16 +53,16 @@ def criar_svm():
 
 
 def avancar(acao):
-    # A pausa dá tempo de discutir o que esperamos ver antes de mostrar a próxima etapa.
     input(f"\n[Enter] {acao} ")
 
 
 def mostrar_dados(nomes, atributos):
     print("\nBASE DE ORGANISMOS")
     print(f"{len(nomes)} linhas, cada uma com {atributos.shape[1]} características.")
-    # O morcego-vampiro é o exemplo dos slides. A mesma linha ajuda a ligar a explicação aos dados.
+    # Pelo nome, encontramos as medidas do morcego-vampiro mesmo se a ordem da base mudar.
     linha = nomes.index("Desmodus_rotundus")
     valores = "  ".join(f"{valor:.4f}" for valor in atributos[linha, :5]).replace(".", ",")
+    # Somamos 1 para que o número exibido corresponda à linha no arquivo original.
     print(f"Names.txt  | linha {linha + 1}: {nomes[linha]}")
     print(f"wpc50.dat  | mesma linha, primeiros 5 valores: {valores}")
     print("A SVM recebe os 50 números. O nome serve para conferir a classe.")
@@ -85,8 +85,8 @@ def escolher_candidatos(atributos, classes, consultados):
 def mostrar_indicacoes(rodada, nomes, candidatos, pontuacoes):
     print(f"\nRODADA {rodada} | {len(candidatos)} candidatos para conferir")
     print(f"A SVM escolhe até {TAMANHO_LOTE} linhas com pontuação acima de zero, da maior para a menor.")
-    print("Compare as pontuações nas extremidades do lote:")
-    # O primeiro e o último dão uma ideia da faixa de pontuações sem projetar o lote inteiro.
+    print("Maior e menor pontuação do lote:")
+    # O lote já está em ordem de pontuação. Com um único candidato, os dois extremos coincidem.
     extremos = np.unique([0, len(candidatos) - 1])
     for ordem in extremos:
         posicao = candidatos[ordem]
@@ -193,8 +193,8 @@ def avaliar(atributos, classes, nomes, apresentar=False):
 
 
 def exportar(nomes, classes, etapas):
-    # A classificação guarda a etapa para podermos explicar de onde veio cada rótulo.
-    # Os índices começam em 1 para quem quiser localizar um morcego nos arquivos do professor.
+    # A etapa registra se a classe veio da consulta inicial, de uma rodada ou da falta de indicação.
+    # Os índices começam em 1 para quem quiser localizar um morcego nos arquivos disponibilizados.
     destino = PASTA / "resultados"
     destino.mkdir(exist_ok=True)
     with (destino / "classificacao.csv").open("w", encoding="utf-8", newline="") as arquivo:
@@ -227,13 +227,11 @@ def principal(apresentar=False):
 
 
 if __name__ == "__main__":
-    # Na aula, o grupo escolhe quando avançar. As pausas usam a mesma busca da execução automática.
     argumentos = argparse.ArgumentParser(description=__doc__)
     argumentos.add_argument("--apresentar", action="store_true", help="avança por etapas com a tecla Enter")
     try:
         principal(argumentos.parse_args().apresentar)
     except EOFError:
-        raise SystemExit("A apresentação precisa de entrada pelo teclado. Abra o PowerShell ou execute sem --apresentar.")
+        sys.exit(1)
     except KeyboardInterrupt:
-        print("\nExecução interrompida.")
-        raise SystemExit(130)
+        sys.exit(130)
