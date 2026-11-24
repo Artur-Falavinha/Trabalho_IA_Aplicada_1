@@ -8,15 +8,29 @@ Começamos com 29 exemplos conhecidos. Em quatro rodadas, uma SVM indicou 73 lin
 
 ## Como executar
 
-Com Python 3.14, abra o PowerShell na pasta do projeto e execute:
+**Na hora da apresentação**, abra a pasta do projeto no Explorador de Arquivos do Windows e dê dois cliques em **`apresentar.cmd`**. A janela mostra a pesquisa inicial, as quatro rodadas e as três métricas. Ela fica aberta até você pressionar uma tecla.
+
+Para mostrar a execução diretamente no PowerShell, use `.\.venv\Scripts\python.exe classificar_morcegos.py`.
+
+Se o professor pedir para ver a entrega, abra `resultados\indices_morcegos.txt` para mostrar os 79 índices ou `resultados\classificacao.csv` para mostrar o nome, a classe e a etapa de cada uma das 8.426 linhas.
+
+### Antes da apresentação
+
+Faça o preparo uma vez **no computador que será usado**, com internet. Se baixou o projeto como ZIP, extraia a pasta inteira primeiro. Com Python 3.14 instalado, abra o PowerShell na pasta que contém `apresentar.cmd` e execute:
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe classificar_morcegos.py
 ```
 
-Se usar `uv`, o comando equivalente é `uv run --python 3.14 --with-requirements requirements.txt python classificar_morcegos.py`. A execução usa os arquivos do professor e uma [tabela local de rótulos e fontes](dados/rotulos.csv). Após instalar as dependências, funciona sem internet.
+Se já usa `uv`, o preparo equivalente é:
+
+```powershell
+uv venv --python 3.14 .venv
+uv pip install --python .venv\Scripts\python.exe -r requirements.txt
+```
+
+Rode `apresentar.cmd` uma vez para ensaiar. A partir daí, a demonstração funciona sem internet, com os dados e a [tabela de rótulos](dados/rotulos.csv) da própria pasta. Se mudar o projeto de pasta ou de computador, refaça o preparo no destino.
 
 ## O que o programa entrega
 
