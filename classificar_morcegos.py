@@ -13,7 +13,9 @@ from sklearn.svm import SVC
 
 
 PASTA = Path(__file__).resolve().parent
+# Com até 20 consultas por rodada, a SVM pode aprender com esse lote antes de escolher o próximo.
 TAMANHO_LOTE = 20
+# Há outros mamíferos entre os exemplos iniciais: ser mamífero, por si só, não identifica um morcego.
 NOMES_INICIAIS = """
     Artibeus_jamaicensis Desmodus_rotundus Myotis_lucifugus Pteropus_vampyrus
     Rhinolophus_monoceros Rousettus_aegyptiacus Tadarida_teniotis Pteronotus_parnellii
@@ -26,6 +28,8 @@ NOMES_INICIAIS = """
 
 
 def ler_dados():
+    # O número da linha liga o nome às 50 medidas e depois vira o índice entregue ao professor.
+    # Se a ordem mudar em um dos arquivos, podemos atribuir as medidas de um animal a outro.
     nomes = (PASTA / "Names.txt").read_text(encoding="utf-8").splitlines()
     nomes = [nome.strip() for nome in nomes]
     atributos = np.loadtxt(PASTA / "wpc50.dat")
@@ -36,22 +40,27 @@ def ler_dados():
         referencia = list(csv.DictReader(arquivo))
     if [linha["nome"] for linha in referencia] != nomes:
         raise ValueError("Os nomes da referência devem seguir a mesma ordem de Names.txt.")
+    # A fonte de cada rótulo permite justificar por que aquela linha recebeu a classe 0 ou 1.
     if any(linha["classe"] not in {"0", "1"} or not linha["fonte"] for linha in referencia):
         raise ValueError("Cada organismo precisa de classe 0 ou 1 e fonte para a consulta.")
     return nomes, atributos, np.array([int(linha["classe"]) for linha in referencia])
 
 
 def criar_svm():
+    # A escala importa porque uma medida com valores altos pode dominar a comparação.
+    # O núcleo RBF permite uma fronteira curva. Os pesos dão mais importância aos erros na classe mais rara.
     return make_pipeline(StandardScaler(), SVC(kernel="rbf", class_weight="balanced"))
 
 
 def avancar(acao):
+    # A pausa dá tempo de discutir o que esperamos ver antes de mostrar a próxima etapa.
     input(f"\n[Enter] {acao} ")
 
 
 def mostrar_dados(nomes, atributos):
     print("\nBASE DE ORGANISMOS")
     print(f"{len(nomes)} linhas, cada uma com {atributos.shape[1]} características.")
+    # O morcego-vampiro é o exemplo dos slides. A mesma linha ajuda a ligar a explicação aos dados.
     linha = nomes.index("Desmodus_rotundus")
     valores = "  ".join(f"{valor:.4f}" for valor in atributos[linha, :5]).replace(".", ",")
     print(f"Names.txt  | linha {linha + 1}: {nomes[linha]}")
@@ -62,8 +71,10 @@ def mostrar_dados(nomes, atributos):
 
 def escolher_candidatos(atributos, classes, consultados):
     restantes = np.flatnonzero(~consultados)
+    # Uma linha só pode ensinar o modelo depois que sua classe foi conferida.
     svm = criar_svm().fit(atributos[consultados], classes[consultados])
     pontuacoes = svm.decision_function(atributos[restantes])
+    # Acima de zero, a SVM indica morcego. A pontuação ajuda a decidir quem conferir primeiro.
     positivos = pontuacoes > 0
     indicados = restantes[positivos]
     pontuacoes_positivas = pontuacoes[positivos]
@@ -75,6 +86,7 @@ def mostrar_indicacoes(rodada, nomes, candidatos, pontuacoes):
     print(f"\nRODADA {rodada} | {len(candidatos)} candidatos para conferir")
     print(f"A SVM escolhe até {TAMANHO_LOTE} linhas com pontuação acima de zero, da maior para a menor.")
     print("Compare as pontuações nas extremidades do lote:")
+    # O primeiro e o último dão uma ideia da faixa de pontuações sem projetar o lote inteiro.
     extremos = np.unique([0, len(candidatos) - 1])
     for ordem in extremos:
         posicao = candidatos[ordem]
@@ -85,6 +97,7 @@ def mostrar_indicacoes(rodada, nomes, candidatos, pontuacoes):
 
 
 def mostrar_conferencia(nomes, exemplos, classes, candidatos):
+    # Rever os mesmos animais permite comparar o palpite da SVM com o rótulo que vai para o treino.
     print("\nResultado da consulta para os mesmos exemplos:")
     for posicao in exemplos:
         classe = "morcego" if classes[posicao] else "outro organismo"
@@ -97,10 +110,13 @@ def mostrar_conferencia(nomes, exemplos, classes, candidatos):
 
 
 def prospectar(nomes, atributos, referencia, apresentar=False):
+    # Para aprender a separar os grupos, o primeiro treino precisa de exemplos de ambos.
     iniciais = np.isin(nomes, NOMES_INICIAIS)
     if iniciais.sum() != len(NOMES_INICIAIS) or set(referencia[iniciais]) != {0, 1}:
         raise ValueError("Os exemplos iniciais precisam estar presentes e incluir as duas classes.")
 
+    # Uma linha ainda sem consulta também começa com zero. A etapa distingue esse caso
+    # de um organismo que já conferimos e sabemos que pertence à classe 0.
     classes = np.zeros(len(nomes), dtype=int)
     classes[iniciais] = referencia[iniciais]
     etapas = np.full(len(nomes), "sem indicação", dtype=object)
@@ -121,12 +137,15 @@ def prospectar(nomes, atributos, referencia, apresentar=False):
             print(f"\nBUSCA COM {consultados.sum()} EXEMPLOS NO TREINO")
             print(f"Ajustando a escala e a SVM. Linhas a examinar: {(~consultados).sum()}.")
         candidatos, pontuacoes = escolher_candidatos(atributos, classes, consultados)
+        # Sem indicações, não há um novo lote para ensinar à SVM. A lista será conferida ao final.
         if candidatos.size == 0:
             if apresentar:
                 print("Nenhuma pontuação positiva. A busca termina aqui.")
             break
         if apresentar:
             exemplos = mostrar_indicacoes(rodada, nomes, candidatos, pontuacoes)
+        # Conferimos só depois da escolha. Um candidato rejeitado também ensina:
+        # é um exemplo real de algo que a SVM confundiu com morcego.
         classes[candidatos] = referencia[candidatos]
         etapas[candidatos] = f"rodada {rodada}"
         if apresentar:
@@ -138,6 +157,8 @@ def prospectar(nomes, atributos, referencia, apresentar=False):
 
 
 def avaliar(atributos, classes, nomes, apresentar=False):
+    # Há poucos morcegos. Manter proporções parecidas nas cinco partes ajuda a testar essa classe
+    # em todas elas. A semente fixa permite repetir a avaliação com a mesma divisão.
     divisoes = StratifiedKFold(n_splits=5, shuffle=True, random_state=803)
     previsoes = np.empty_like(classes)
     if apresentar:
@@ -145,6 +166,7 @@ def avaliar(atributos, classes, nomes, apresentar=False):
         print("\nVALIDAÇÃO | Cada linha fica fora do treino uma vez.")
         print("Parte   Linhas de treino   Linhas de teste   Erros no teste")
     for parte, (treino, teste) in enumerate(divisoes.split(atributos, classes), start=1):
+        # Recomeçamos em cada parte para que nem o ajuste da escala nem a SVM tenham visto o teste.
         modelo = criar_svm().fit(atributos[treino], classes[treino])
         previsoes[teste] = modelo.predict(atributos[teste])
         if apresentar:
@@ -161,6 +183,8 @@ def avaliar(atributos, classes, nomes, apresentar=False):
     else:
         print(f"Validação em cinco partes: positivos corretos = {vp}, negativos corretos = {vn}, "
               f"falsos positivos = {fp}, falsos negativos = {fn}.")
+    # Com tantos outros organismos, a acurácia pode ser alta mesmo se algum morcego passar batido.
+    # A sensibilidade mostra que fração dos morcegos encontramos. A precisão diz que fração das indicações acertamos.
     for nome, acertos, total in [
         ("Sensibilidade", vp, vp + fn), ("Precisão", vp, vp + fp), ("Acurácia", vp + vn, len(classes)),
     ]:
@@ -169,6 +193,8 @@ def avaliar(atributos, classes, nomes, apresentar=False):
 
 
 def exportar(nomes, classes, etapas):
+    # A classificação guarda a etapa para podermos explicar de onde veio cada rótulo.
+    # Os índices começam em 1 para quem quiser localizar um morcego nos arquivos do professor.
     destino = PASTA / "resultados"
     destino.mkdir(exist_ok=True)
     with (destino / "classificacao.csv").open("w", encoding="utf-8", newline="") as arquivo:
@@ -185,6 +211,8 @@ def principal(apresentar=False):
     if apresentar:
         mostrar_dados(nomes, atributos)
     classes, etapas = prospectar(nomes, atributos, referencia, apresentar)
+    # A SVM parar de indicar candidatos não garante que encontrou todos os morcegos.
+    # A comparação com a referência completa permite descobrir se algum ficou de fora.
     divergencias = np.flatnonzero(classes != referencia) + 1
     if divergencias.size:
         raise ValueError(f"A busca divergiu da referência nos índices: {divergencias.tolist()}.")
@@ -199,6 +227,7 @@ def principal(apresentar=False):
 
 
 if __name__ == "__main__":
+    # Na aula, o grupo escolhe quando avançar. As pausas usam a mesma busca da execução automática.
     argumentos = argparse.ArgumentParser(description=__doc__)
     argumentos.add_argument("--apresentar", action="store_true", help="avança por etapas com a tecla Enter")
     try:
