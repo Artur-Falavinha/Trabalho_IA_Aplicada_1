@@ -131,6 +131,24 @@ def avaliar_rodadas(atributos, rotulos, bases_por_rodada, teste):
     return medidas
 
 
+def concluir_prospeccao(atributos, rotulos, conhecidos):
+    restantes = np.setdiff1d(np.arange(len(atributos)), conhecidos)
+    svm = criar_svm().fit(atributos[conhecidos], rotulos[conhecidos])
+    indicados = restantes[svm.predict(atributos[restantes]) == 1]
+
+    consultados = np.concatenate([conhecidos, indicados])
+    classificacao = np.zeros(len(atributos), dtype=int)
+    classificacao[consultados] = rotulos[consultados]
+    return classificacao, indicados
+
+
+def conferir_classificacao(classificacao, referencia):
+    indices_divergentes = np.flatnonzero(classificacao != referencia) + 1
+    if indices_divergentes.size:
+        indices = ", ".join(map(str, indices_divergentes))
+        raise ValueError(f"A classificação final diverge da referência nos índices {indices}.")
+
+
 def avaliar_base_final(atributos, rotulos, particoes):
     previsoes = {"SVM RBF": np.zeros_like(rotulos), "k-NN (k=5)": np.zeros_like(rotulos),
                  "Sempre outro": np.zeros_like(rotulos)}
@@ -175,10 +193,14 @@ def principal():
     treino, teste = particoes[0]
     historico, bases_por_rodada = prospectar(nomes, atributos, rotulos, treino)
     medidas_rodadas = avaliar_rodadas(atributos, rotulos, bases_por_rodada, teste)
-    medidas_finais, previsoes, numero_particao = avaliar_base_final(atributos, rotulos, particoes)
+    conhecidos = bases_por_rodada[-1]
+    classificacao, indicados = concluir_prospeccao(atributos, rotulos, conhecidos)
+    conferir_classificacao(classificacao, rotulos)
+    historico.extend(("fechamento", "triagem final SVM", posicao) for posicao in indicados)
+    medidas_finais, previsoes, numero_particao = avaliar_base_final(atributos, classificacao, particoes)
 
     RESULTADOS.mkdir(exist_ok=True)
-    exportar_classificacao(nomes, rotulos)
+    exportar_classificacao(nomes, classificacao)
     escrever_csv("candidatos.csv", ["rodada", "criterio", "indice", "nome", "classe_confirmada"],
                  ((rodada, criterio, posicao + 1, nomes[posicao], rotulos[posicao])
                   for rodada, criterio, posicao in historico))
@@ -189,7 +211,9 @@ def principal():
                    previsoes["SVM RBF"][posicao], previsoes["k-NN (k=5)"][posicao])
                   for posicao in range(len(nomes))))
     exportar_pca(atributos)
-    print(f"{len(nomes):,} instâncias, {rotulos.sum()} morcegos, {len(historico)} rótulos na prospecção.")
+    print(f"Rótulos consultados até a última rodada: {len(conhecidos)}. "
+          f"Candidatos indicados no fechamento: {len(indicados)} de {len(nomes) - len(conhecidos)}.")
+    print(f"A auditoria confirmou as classes das {len(nomes)} instâncias, incluindo {classificacao.sum()} morcegos.")
     for linha in medidas_finais:
         print(f"{linha['modelo']}: sensibilidade {linha['sensibilidade']:.2%}, "
               f"precisão {linha['precisao']:.2%}, acurácia {linha['acuracia']:.2%}.")
