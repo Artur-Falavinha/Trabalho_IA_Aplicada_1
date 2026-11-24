@@ -4,7 +4,9 @@ Trabalho de reconhecimento de padrões da disciplina DS803, UFPR. A classe `1` r
 
 [Enunciado do trabalho no Drive da disciplina](https://drive.google.com/file/d/1rgFNyVS6eeG3GUL6dRMKwjYgZm-r98P2/view).
 
-[Leia a resolução passo a passo](docs/resolucao.md) para entender como os dados foram rotulados, como as rodadas encontraram candidatos e o que significam as métricas.
+Partimos de 11 morcegos conhecidos. As seis rodadas encontraram mais 52. A SVM examinou as 8.220 linhas que restavam, indicou outras 16 e a consulta taxonômica confirmou as 16. A lista final reúne os **79 morcegos**.
+
+[Resolução passo a passo](docs/resolucao.md) · [Relatório](relatorio_morcegos.pdf) · [Slides em PDF](output/pdf/slides_morcegos.pdf) · [Roteiro de apresentação](output/pdf/roteiro_apresentacao_morcegos.pdf)
 
 ## Executar
 
@@ -22,9 +24,9 @@ Se você usa `uv`, execute `uv run --python 3.14 --with-requirements requirement
 
 1. `ler_dados` confere o alinhamento por linha entre os nomes, as 50 características e a tabela de referência.
 2. `prospectar` começa com exemplos pesquisados. Em cada rodada, `priorizar_candidatos` escolhe 12 vizinhos de morcegos conhecidos, 12 pontos perto da fronteira da SVM e 6 exemplos ao acaso. A base de treino cresce com os rótulos desses 30 candidatos confirmados na referência.
-3. `avaliar_rodadas` mede a SVM em uma partição reservada. A referência completa permite estratificar a divisão, mas a função de seleção usa os rótulos somente das linhas já confirmadas.
-4. `avaliar_base_final` compara SVM e k-NN em cinco partes sobre o conjunto supervisionado. Cada previsão foi gerada por um modelo que treinou nas outras quatro partes. Registros com o mesmo TaxID de espécie ficam juntos quando disponível. O código usa o TaxID encontrado como alternativa nos demais casos.
-5. `exportar_classificacao` grava as classes confirmadas na ordem original. `exportar_pca` gera uma visão em duas dimensões para o relatório.
+3. `avaliar_rodadas` mede a SVM em uma parte reservada da base. Essas linhas ficam fora da seleção de candidatos e do treino durante as seis rodadas.
+4. `concluir_prospeccao` treina a SVM com os 206 exemplos consultados e procura morcegos nas 8.220 linhas restantes. O programa consulta o rótulo dos 16 candidatos que a SVM indica. Com isso, monta a lista final e confere cada classe contra a referência completa.
+5. `avaliar_base_final` compara SVM e k-NN em cinco partes. Cada previsão vem de um modelo treinado nas outras quatro. A divisão mantém juntos os registros com o mesmo TaxID de espécie quando disponível, usando o TaxID encontrado nos demais casos.
 
 ## Arquivos da entrega
 
@@ -32,12 +34,11 @@ Se você usa `uv`, execute `uv run --python 3.14 --with-requirements requirement
 |---|---|
 | `resultados/classificacao.csv` | Classe das 8.426 linhas na ordem original |
 | `resultados/indices_morcegos.txt` | Índices dos 79 morcegos, um por linha |
-| `resultados/candidatos.csv` | Exemplos iniciais e candidatos confirmados por rodada e critério |
+| `resultados/candidatos.csv` | 26 exemplos iniciais, 180 candidatos das rodadas e 16 candidatos da triagem final, identificados por `fechamento` |
 | `resultados/rodadas.csv` | Evolução da base e desempenho na partição reservada |
 | `resultados/metricas.csv` | Matriz de confusão e métricas agregadas por modelo |
 | `resultados/previsoes_validacao.csv` | Partição, classe e previsões de SVM e k-NN para cada linha |
 | `dados/referencia_taxonomica.csv` | Nome original, rótulo, TaxID, método e fonte de cada confirmação |
-| `relatorio_morcegos.pdf` | Relatório com método, resultados, referências e campo de autoria editável |
 
 ## Reconstruir a referência taxonômica
 
