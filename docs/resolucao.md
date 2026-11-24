@@ -50,12 +50,21 @@ flowchart TD
 
 Dos 52 novos morcegos, **46 vieram pela vizinhança** e **6 pela fronteira da SVM**. O sorteio trouxe exemplos da classe `0`. A [lista de candidatos](../resultados/candidatos.csv) mostra a rodada, o critério e a classe confirmada de cada linha.
 
-## 4. Meça o desempenho
+## 4. Passe dos 63 morcegos das rodadas aos 79 da lista
 
-Fizemos duas avaliações que respondem a perguntas diferentes.
+Primeiro medimos o efeito das rodadas. Para cada etapa, treinamos a SVM com os exemplos disponíveis naquele momento e fizemos o mesmo teste em **1.686 linhas reservadas**, entre elas 16 morcegos. A SVM detectou os 16 desde o início. As linhas marcadas por engano como morcego caíram de cinco para zero após a primeira rodada. A reserva ficou fora da seleção e do treino durante as seis rodadas.
 
-1. **As rodadas ajudaram?** Comparamos a SVM de cada rodada na mesma parte reservada. Ela tinha 1.686 linhas, sendo 16 morcegos. A SVM detectou os 16 desde o início. Os falsos positivos caíram de cinco na amostra inicial para zero após a primeira rodada. Essa parte da base ficou fora da busca de candidatos e do treino das rodadas.
-2. **Como os modelos se saem na base completa?** Separamos a base rotulada em cinco partes e repetimos o teste cinco vezes. Em cada vez, quatro partes serviram para treinar e uma para testar. O código mantém juntos os registros com o mesmo identificador de espécie quando disponível. Comparamos a SVM com o **k-NN**, que prevê a classe a partir de cinco vizinhos e dá mais peso aos mais próximos.
+Depois desse teste, ainda tínhamos **8.220 linhas sem consulta individual na busca**. Como descobrir se alguma era morcego?
+
+1. Treinamos a SVM com os 206 exemplos consultados até a sexta rodada. Entre eles havia 63 morcegos.
+2. Aplicamos a SVM aos 50 valores de cada uma das 8.220 linhas restantes. O modelo indicou **16 candidatas**, entre elas a linha **3942**, de *Lasiurus borealis*.
+3. Conferimos essas 16 na referência taxonômica. Todas eram morcegos e todas estavam na parte que havia sido reservada. Elas aparecem na [lista de candidatos](../resultados/candidatos.csv) com a marca `fechamento`.
+
+Mantivemos as classes já consultadas e atribuímos a classe 0 às 8.204 linhas restantes. Assim chegamos aos **11 morcegos iniciais + 52 encontrados nas rodadas + 16 do fechamento = 79**. Por fim, comparamos a lista pronta com a referência completa. As 8.426 classes coincidiram.
+
+## 5. Teste os modelos na base completa
+
+Agora a pergunta é outra. Quando um modelo recebe só os números de organismos fora do seu treino, quantos ele classifica corretamente? Separamos a base rotulada em cinco partes. Cada parte serviu uma vez para teste, com as outras quatro para treino. Mantivemos juntos os registros com o mesmo identificador de espécie quando disponível. Comparamos a SVM com o **k-NN**, que prevê a classe a partir de cinco vizinhos e dá mais peso aos mais próximos.
 
 Na validação cruzada, **cada modelo previu 80 morcegos, acertou 79 e gerou um falso positivo**. Os falsos positivos ocorreram em linhas diferentes. A SVM marcou *Scapanulus oweni* (7013) e o k-NN marcou *Hylomys suillus* (3597).
 
@@ -65,11 +74,11 @@ Na validação cruzada, **cada modelo previu 80 morcegos, acertou 79 e gerou um 
 | Precisão | Das linhas que o modelo marcou como morcego, quantas estavam certas? | 79 de 80 · 98,75% |
 | Acurácia | De todas as linhas, quantas foram classificadas corretamente? | 8.425 de 8.426 · 99,99% |
 
-Como há poucos morcegos na base, a regra de marcar todas as linhas como `0` acerta **99,06%** e perde os 79 morcegos. A sensibilidade mostra esse problema. Os resultados se referem à base da disciplina.
+Como há poucos morcegos na base, a regra de marcar todas as linhas como `0` acerta **99,06%** e perde os 79 morcegos. A sensibilidade mostra esse problema. O empate entre os modelos vale para essa divisão. Mesmo com o agrupamento por identificador, 38 linhas da classe 0 tinham os mesmos 50 valores de outra linha usada no respectivo treino.
 
-## 5. Confira a entrega e reproduza o experimento
+## 6. Confira a entrega e reproduza o experimento
 
-- [`classificacao.csv`](../resultados/classificacao.csv) contém **79 morcegos e 8.347 outros organismos**, com os rótulos confirmados na ordem da base original.
+- [`classificacao.csv`](../resultados/classificacao.csv) contém **79 morcegos e 8.347 outros organismos**, na ordem original. As classes foram geradas pela busca e conferidas contra a referência.
 - [`indices_morcegos.txt`](../resultados/indices_morcegos.txt) lista os 79 índices positivos, um por linha.
 - [`previsoes_validacao.csv`](../resultados/previsoes_validacao.csv) permite comparar as previsões de cada modelo com a classe confirmada.
 - [`rodadas.csv`](../resultados/rodadas.csv), [`metricas.csv`](../resultados/metricas.csv) e o [relatório](../relatorio_morcegos.pdf) registram os testes.
